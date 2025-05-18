@@ -1,0 +1,3 @@
+{
+    "body": "{\n        \"user_input\": [\n            {\n                \"user_name\": \"vaibhav\",\n                \"message_content\": \"Hi Brainstormer!\",\n                \"is_gpt_response\": false\n            },\n            {\n                \"user_name\": \"\",\n                \"message_content\": \"Hi Vaibhav!\",\n                \"is_gpt_response\": true\n            },\n            {\n                \"user_name\": \"\",\n                \"message_content\": \"How are you doing?\",\n                \"is_gpt_response\": false\n            }\n        ]\n    }"
+}

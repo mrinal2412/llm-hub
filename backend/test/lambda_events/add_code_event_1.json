@@ -1,0 +1,23 @@
+{
+  "code_data": [
+    {
+      "code": "import { UserProfileRequest, UserProfileResponse, User } from '../types/Types';\n\nexport const getUserProfile = async (request: UserProfileRequest): Promise<UserProfileResponse> => {\n  try {\n    console.log('Sending getUserProfile API request...');\n    console.log('Request:', request);\n\n    // Simulating API call and generating random data\n    const userProfile: User = generateRandomUserProfile();\n\n    console.log('Received getUserProfile API response...');\n    console.log('Response:', userProfile);\n\n    return { user: userProfile };\n  } catch (error) {\n    console.error('Error in getUserProfile API:', error);\n    throw error;\n  }\n};\n\n// Helper function to generate random user profile\nconst generateRandomUserProfile = (): User => {\n  // Generate random user profile data here\n  return {\n    name: 'John Doe',\n    email: 'johndoe@example.com',\n    contactInfo: '1234567890',\n    address: '123 Main St',\n    profilePicture: 'https://example.com/profile.jpg',\n  };\n};",
+      "filepath": "./react-test-code/ProfileApi.ts",
+      "filename": "ProfileApi.ts",
+      "language": "javascript"
+    },
+    {
+      "code": "// File: src/types/Types.ts\n\nexport interface User {\n  name: string;\n  email: string;\n  contactInfo?: string;\n  address?: string;\n  profilePicture?: string;\n}\n\nexport interface UserRegistrationRequest {\n  name: string;\n  email: string;\n  password: string;\n}\n\nexport interface UserRegistrationResponse {\n  success: boolean;\n  message: string;\n}\n\nexport interface UserLoginRequest {\n  email: string;\n  password: string;\n}\n\nexport interface UserLoginResponse {\n  success: boolean;\n  message: string;\n  token?: string;\n}\n\nexport interface UserProfileRequest {\n  token: string;\n}\n\nexport interface UserProfileResponse {\n  user: User;\n}\n\nexport interface UserProfileUpdateRequest {\n  token: string;\n  name?: string;\n  contactInfo?: string;\n  address?: string;\n  profilePicture?: string;\n}\n\nexport interface UserProfileUpdateResponse {\n  success: boolean;\n  message: string;\n}\n\nexport interface AdminUserDetailsRequest {\n  token: string;\n}\n\nexport interface AdminUserDetailsResponse {\n  users: User[];\n}\n\nconsole.log('Types.ts initialized');",
+      "filepath": "./react-test-code/Types.ts",
+      "filename": "Types.ts",
+      "language": "javascript"
+    },
+    {
+      "code": "import React, { useState } from 'react';\nimport { View, TextInput, Button } from 'react-native';\n\nconst RegistrationForm = () => {\n  const [name, setName] = useState('');\n  const [email, setEmail] = useState('');\n  const [password, setPassword] = useState('');\n\n  const handleRegistration = () => {\n    console.log('Step 1: User visits the registration page');\n    console.log('Name:', name);\n    console.log('Email:', email);\n    console.log('Password:', password);\n\n    // Perform API call for user registration here\n    console.log('Step 2: User submits the registration form');\n\n    // Assuming the API call is successful\n    console.log('Registration successful');\n  };\n\n  console.log('RegistrationForm initialized');\n\n  return (\n    <View>\n      <TextInput\n        placeholder=\"Name\"\n        value={name}\n        onChangeText={setName}\n      />\n      <TextInput\n        placeholder=\"Email\"\n        value={email}\n        onChangeText={setEmail}\n      />\n      <TextInput\n        placeholder=\"Password\"\n        value={password}\n        onChangeText={setPassword}\n        secureTextEntry\n      />\n      <Button title=\"Register\" onPress={handleRegistration} />\n    </View>\n  );\n};\n\nexport default RegistrationForm;",
+      "filepath": "./react-test-code/RegistrationForm.ts",
+      "filename": "RegistrationForm.ts",
+      "language": "javascript"
+    }
+  ],
+  "index_name": "test-code-index-1"
+}

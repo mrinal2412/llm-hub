@@ -1,0 +1,61 @@
+.venv
+.aws-sam/
+
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+*.egg-info
+
+.vscode
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Skip DB files
+*.db
+
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Apify storage folder
+storage/
+
+# Python virtual environment
+.ingestion_venv/
+.venv/
+.env/
+
+# Python (and python tools) cache files
+__pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Python build files
+__pypackages__/
+dist/
+build/
+*.egg-info/
+*.egg
+
+# log files
+*.log
+
+# next js
+.next/
+node_modules/*
+*/.next/*
+web/.next/*
+*/node_modules/*
+
+
+.env.local
+*.env
+backend/flask/.env
+*backend/flask/.env*
