@@ -1,8 +1,11 @@
 import logging
 
 # from .api.prompt_store import stream_chat, ingest
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Depends, HTTPException,status
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import Field, BaseModel
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import Response
@@ -14,6 +17,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 from datadog import initialize, statsd
 import os
+from backend.flask.db.psql import get_db
+from backend.flask.model.models import Prompt, StatusEnum
 
 load_dotenv()
 app = FastAPI()
@@ -28,7 +33,8 @@ class Status(str, Enum):
     Draft ="Draft"
 
 class PromptIn(BaseModel):
-    name:   constr(min_length=1)
+    name:   str = Field(..., min_length=1)
+    version: str = Field(..., min_length=1, description="version, e.g. '1.0.0'")
     status: Status
 # options = {
 #     "api_key": os.environ.get("DATADOG_API_KEY"),
@@ -101,19 +107,51 @@ async def echo_endpoint(req: EchoRequest):
     }
 
 @app.post("/prompts")
-async def ingest_prompt(payload: PromptIn):
+async def ingest_prompt(
+    payload: PromptIn,
+    db:      AsyncSession = Depends(get_db),   # ← inject the DB session
+):
+   
     print(
-        f"👉 Ingesting prompt → "
-        f"name={payload.name!r}, status={payload.status.value!r}"
+        f"Ingesting prompt: "
+        f"name={payload.name}, "
+        f"version={payload.version}, "
+        f"status={payload.status.value}"
+    ) 
+    prompt_obj = Prompt(
+        name    = payload.name,
+        version = payload.version,
+        status  = StatusEnum(payload.status),
     )
-    # TODO: insert into your PostgreSQL DB here
+
+    db.add(prompt_obj)
+    try:
+        await db.commit()
+        await db.refresh(prompt_obj)   # get back the generated id
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Prompt name '{payload.name}' already exists."
+        )
+
+    # 4) Return the new record
     return {
-        "message": "Prompt received",
-        "prompt": {
-            "name":   payload.name,
-            "status": payload.status.value
-        }
+        "id":      prompt_obj.id,
+        "name":    prompt_obj.name,
+        "version": prompt_obj.version,
+        "status":  prompt_obj.status.value,
     }
+    
+    # TODO: insert into your PostgreSQL DB here
+    # return {
+    #     "message": "Prompt received",
+    #     "prompt": {
+    #         "name":   payload.name,
+    #         "version": payload.version,
+    #         "status": payload.status.value
+    #     }
+    # }
 
 @app.websocket("/stream")
 async def stream_chat(websocket: WebSocket):
