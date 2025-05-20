@@ -1,11 +1,15 @@
 import logging
+
+# from .api.prompt_store import stream_chat, ingest
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import Response
 from fastapi.responses import StreamingResponse
-
+from pydantic import BaseModel
+from enum import Enum
+from pydantic import constr
 from dotenv import load_dotenv
 from pathlib import Path
 from datadog import initialize, statsd
@@ -14,9 +18,18 @@ import os
 load_dotenv()
 app = FastAPI()
 
-
+class EchoRequest(BaseModel):
+    version: str
+    prompt:  str
 env = os.environ.get("ENV")
 
+class Status(str, Enum):
+    LIVE = "LIVE"
+    Draft ="Draft"
+
+class PromptIn(BaseModel):
+    name:   constr(min_length=1)
+    status: Status
 # options = {
 #     "api_key": os.environ.get("DATADOG_API_KEY"),
 #     "app_key": os.environ.get("DATADOG_APP_KEY"),
@@ -76,22 +89,47 @@ app.middleware("http")(catch_exceptions_middleware)
 def hello_world():
     return "Hello World"
 
+@app.post("/echo")
+async def echo_endpoint(req: EchoRequest):
+    
+    print(f"👉 Received echo request: version={req.version!r}, prompt={req.prompt!r}")
+    
+    # Return exactly what you received
+    return {
+        "version": req.version,
+        "prompt":  req.prompt
+    }
 
-# @app.websocket("/stream")
-# async def stream_chat(websocket: WebSocket):
-#     await websocket.accept()
-#     prompt = await websocket.receive_text()
-#     print(prompt)
-#     await websocket.send_text("what's upp")
-#     await websocket.close()
+@app.post("/prompts")
+async def ingest_prompt(payload: PromptIn):
+    print(
+        f"👉 Ingesting prompt → "
+        f"name={payload.name!r}, status={payload.status.value!r}"
+    )
+    # TODO: insert into your PostgreSQL DB here
+    return {
+        "message": "Prompt received",
+        "prompt": {
+            "name":   payload.name,
+            "status": payload.status.value
+        }
+    }
+
+@app.websocket("/stream")
+async def stream_chat(websocket: WebSocket):
+    await websocket.accept()
+    prompt = await websocket.receive_text()
+    print(prompt)
+    await websocket.send_text("what's upp")
+    await websocket.close()
 
 
-@app.get("/chat")
-async def stream_chat_api():
-    query = "What is serverless?"
-    return StreamingResponse(stream_chat(query), media_type="text/event-stream")
+# @app.get("/chat")
+# async def stream_chat_api():
+#     query = "What is serverless?"
+#     return StreamingResponse(stream_chat(query), media_type="text/event-stream")
 
 
-@app.get("/ingest")
-async def ingest_api():
-    return await ingest()
+# @app.get("/ingest")
+# async def ingest_api():
+#     return await ingest()
