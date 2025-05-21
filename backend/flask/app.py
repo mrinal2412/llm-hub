@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import Field, BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from starlette.responses import Response
@@ -36,6 +37,8 @@ class PromptIn(BaseModel):
     name:   str = Field(..., min_length=1)
     version: str = Field(..., min_length=1, description="version, e.g. '1.0.0'")
     status: Status
+    body:    str = Field(..., min_length=1, description="The full prompt text")
+
 # options = {
 #     "api_key": os.environ.get("DATADOG_API_KEY"),
 #     "app_key": os.environ.get("DATADOG_APP_KEY"),
@@ -82,29 +85,60 @@ app.add_middleware(
 
 app.middleware("http")(catch_exceptions_middleware)
 
-# app.include_router(retrieve_doc_router)
-# app.include_router(create_project_router)
-# app.include_router(get_project_router)
-# app.include_router(link_github_router)
-# app.include_router(retrieve_org_router)
-# app.include_router(tasks_router)
-# app.include_router(github_webhook_router)
-# app.include_router(onboard_user_router)
+@app.post("/prompts/version")
+async def add_prompt_version(
+    payload: PromptIn,
+    db: AsyncSession = Depends(get_db),
+):
+    # 1. Reject if name+version already exists
+    existing = await db.execute(
+        select(Prompt).where(Prompt.name == payload.name, Prompt.version == payload.version)
+    )
+    if existing.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Prompt '{payload.name}' with version '{payload.version}' already exists.",
+        )
 
-@app.get("/")
-def hello_world():
-    return "Hello World"
+    # 2. Reject if any version with same name is already marked LIVE
+    live_check = await db.execute(
+        select(Prompt).where(Prompt.name == payload.name, Prompt.status == StatusEnum.LIVE)
+    )
+    if live_check.scalar():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot add version to prompt '{payload.name}' because it is marked as LIVE.",
+        )
 
-@app.post("/echo")
-async def echo_endpoint(req: EchoRequest):
-    
-    print(f"👉 Received echo request: version={req.version!r}, prompt={req.prompt!r}")
-    
-    # Return exactly what you received
+    # 3. Proceed to insert
+    prompt_obj = Prompt(
+        name=payload.name,
+        version=payload.version,
+        status=StatusEnum(payload.status),
+        body=payload.body,
+    )
+
+    db.add(prompt_obj)
+    try:
+        await db.commit()
+        await db.refresh(prompt_obj)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected DB integrity error while adding version."
+        )
+
     return {
-        "version": req.version,
-        "prompt":  req.prompt
+        "id": prompt_obj.id,
+        "name": prompt_obj.name,
+        "version": prompt_obj.version,
+        "status": prompt_obj.status.value,
+        "body": prompt_obj.body,
     }
+
+
+
 
 @app.post("/prompts")
 async def ingest_prompt(
@@ -117,11 +151,14 @@ async def ingest_prompt(
         f"name={payload.name}, "
         f"version={payload.version}, "
         f"status={payload.status.value}"
+        f"body={payload.body!r}"
+        
     ) 
     prompt_obj = Prompt(
         name    = payload.name,
         version = payload.version,
         status  = StatusEnum(payload.status),
+        body    = payload.body,
     )
 
     db.add(prompt_obj)
@@ -141,6 +178,7 @@ async def ingest_prompt(
         "name":    prompt_obj.name,
         "version": prompt_obj.version,
         "status":  prompt_obj.status.value,
+        "body":    prompt_obj.body,
     }
     
     # TODO: insert into your PostgreSQL DB here
@@ -162,12 +200,49 @@ async def stream_chat(websocket: WebSocket):
     await websocket.close()
 
 
-# @app.get("/chat")
-# async def stream_chat_api():
-#     query = "What is serverless?"
-#     return StreamingResponse(stream_chat(query), media_type="text/event-stream")
+@app.get("/prompts/{name}/versions")
+async def get_prompt_versions(
+    name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Prompt).where(Prompt.name == name)
+    )
+    prompts = result.scalars().all()
+
+    if not prompts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No prompts found with name '{name}'"
+        )
+
+    return [
+        {
+            "version": p.version,
+            "status": p.status.value,
+            "body": p.body
+        } for p in prompts
+    ]
+@app.get("/prompts/{name}/live")
+async def get_live_prompt_body(
+    name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Prompt).where(Prompt.name == name, Prompt.status == StatusEnum.LIVE)
+    )
+    prompt = result.scalar_one_or_none()
+
+    if not prompt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No LIVE version found for prompt '{name}'"
+        )
+
+    return {
+        "name": prompt.name,
+        "version": prompt.version,
+        "body": prompt.body
+    }
 
 
-# @app.get("/ingest")
-# async def ingest_api():
-#     return await ingest()
